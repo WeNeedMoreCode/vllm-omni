@@ -25,7 +25,7 @@ pwd
 conda env list
 ```
 
-分别显示当前用户、家目录、当前所在目录和已有 Conda 环境。文档中的 `~` 也表示当前用户的家目录，例如 `~/cosmos-physicsiq` 与 `$HOME/cosmos-physicsiq` 指向同一位置。Python 中的 `Path.home()` 通常也是这个用户的家目录；第五节读取结果时用到了它。
+分别显示当前用户、家目录、当前所在目录和已有 Conda 环境。文档中的 `~` 也表示当前用户的家目录，例如 `~/cosmos-physicsiq` 与 `$HOME/cosmos-physicsiq` 指向同一位置。Python 中的 `Path.home()` 通常也是这个用户的家目录。第四、五节客户端使用已经确认的 `PHYSICSIQ_WORKDIR` 读取输入和结果，避免改动 HOME 后指向另一份目录。
 
 终端 A、终端 B 使用同一台 A10 机器上的同一个 Linux 用户，才能按默认路径找到同一份输入和结果。`$HOME` 不表示 vLLM-Omni 仓库目录，也不表示权重目录。
 
@@ -48,7 +48,7 @@ conda env list
 默认输出会放在家目录所在磁盘。若要改到例如 `/data/cosmos-physicsiq`：
 
 1. 将本文所有 Bash 命令里的 `$HOME/cosmos-physicsiq` 统一替换成 `/data/cosmos-physicsiq`，包括下载、准备清单、生成和日志路径。
-2. 第五节 Python 读取结果的 `root = Path.home() / "cosmos-physicsiq/results/a10_original_seed0"` 改成 `root = Path("/data/cosmos-physicsiq/results/a10_original_seed0")`。
+2. 第四节客户端设置 `export PHYSICSIQ_WORKDIR="/data/cosmos-physicsiq"`；第五节从这个变量读取结果，保持同一个终端即可。
 3. 第六节查看和回传文件也使用新的目录。这个目录需要有写权限和足够空间，首次生成前确定好位置；已经准备好的清单包含图片绝对路径，之后不要直接移动输入目录。
 
 无需修改 Linux 的 `HOME` 环境变量。下面正文使用默认的家目录方案。
@@ -134,27 +134,38 @@ find /home/syx/cosmos-baseline -maxdepth 6 -name model_index.json -print
 沿用先前固定权重版本 `344d602b128d1bbdacb43b08d0a3626f46343e29`。如果相同配置的服务已在 8000 端口运行，直接复用；两条请求共用同一服务，不要每条重新加载模型。
 ## 四、终端 B：只生成前两条
 
-另开一个终端，同样进入已有 fork 仓库并激活同一个环境：
+另开一个终端，激活同一个环境。**当前目录如果是 `/sgl-workspace/sglang`，相对路径 `benchmarks/...` 就会被解释成 sglang 下的目录，找不到这里的脚本。** 以下直接使用已确认的 vLLM-Omni 仓库绝对路径，从其他目录也可运行。
+
+先激活环境并检查服务：
 
 ```bash
-cd /home/syx/cosmos-baseline/vllm-omni-baseline
 conda activate cosmos-baseline
-
 curl -f http://127.0.0.1:8000/health
 ```
 
-确认 health 请求成功后，再执行：
+然后定位已经准备好的数据，不修改 Linux 的 `HOME`。下面优先检查你指定的 `/home/syx/cosmos-physicsiq`，其次检查先前 root 用户可能使用的 `/root/cosmos-physicsiq`，只选择同时存在清单和提交配置的目录。不会移动或重新下载数据。
+
+```bash
+if [ -z "${PHYSICSIQ_WORKDIR:-}" ]; then
+  for PHYSICSIQ_CANDIDATE in /home/syx/cosmos-physicsiq /root/cosmos-physicsiq; do
+    if [ -f "$PHYSICSIQ_CANDIDATE/results/a10_original_seed0/cases.json" ] && [ -f "$PHYSICSIQ_CANDIDATE/EDGE_IQVERIFIED_SUBMISSION.yaml" ]; then
+      export PHYSICSIQ_WORKDIR="$PHYSICSIQ_CANDIDATE"
+      break
+    fi
+  done
+fi
+: "${PHYSICSIQ_WORKDIR:?未找到已准备的数据，请先完成第二节；若数据在其他磁盘，请设置 PHYSICSIQ_WORKDIR 为实际工作目录}"
+test -f "$PHYSICSIQ_WORKDIR/results/a10_original_seed0/cases.json" && test -f "$PHYSICSIQ_WORKDIR/EDGE_IQVERIFIED_SUBMISSION.yaml" && printf '本次数据目录：%s\n' "$PHYSICSIQ_WORKDIR"
+```
+
+如果数据放在其他磁盘，先执行例如 `export PHYSICSIQ_WORKDIR="/data/cosmos-physicsiq"`，再运行上面的检查；路径要以已有数据为准。`PHYSICSIQ_WORKDIR` 只管理本次输入和输出，和 Linux 的 `HOME` 是两个不同的变量。修改 `HOME` 也不会自动搬移已有文件，早先启动的服务进程仍保留它启动时的环境。
+
+确认上面打印真实数据目录且没有报错后，在同一个终端执行下面这**一整行**客户端命令，避免多行复制发生符号损坏：
 
 ```bash
 set -o pipefail
-
-python benchmarks/diffusion/cosmos3/physicsiq/run_physicsiq.py generate \
-  --output-dir "$HOME/cosmos-physicsiq/results/a10_original_seed0" \
-  --submission-yaml "$HOME/cosmos-physicsiq/EDGE_IQVERIFIED_SUBMISSION.yaml" \
-  --limit 2 \
-  2>&1 | tee "$HOME/cosmos-physicsiq/timing_two.log"
+python /home/syx/cosmos-baseline/vllm-omni-baseline/benchmarks/diffusion/cosmos3/physicsiq/run_physicsiq.py generate --output-dir "$PHYSICSIQ_WORKDIR/results/a10_original_seed0" --submission-yaml "$PHYSICSIQ_WORKDIR/EDGE_IQVERIFIED_SUBMISSION.yaml" --limit 2 2>&1 | tee "$PHYSICSIQ_WORKDIR/timing_two.log"
 ```
-
 **保留 `--limit 2`**。省略它会跑全部 198 条。当前配置是：
 
 | 参数 | 本次取值 |
@@ -171,14 +182,15 @@ python benchmarks/diffusion/cosmos3/physicsiq/run_physicsiq.py generate \
 
 ## 五、查看实际耗时和全量估算
 
-在终端 B 执行：
+在第四节的同一个终端 B 执行（沿用已确认的 `PHYSICSIQ_WORKDIR`）：
 
 ```bash
-python - <<'PY'
+python - "$PHYSICSIQ_WORKDIR" <<'PY'
 import json
+import sys
 from pathlib import Path
 
-root = Path.home() / "cosmos-physicsiq/results/a10_original_seed0"
+root = Path(sys.argv[1]) / "results/a10_original_seed0"
 data = json.loads((root / "timing_summary.json").read_text())
 
 for index, case in enumerate(data["cases"], 1):
@@ -201,7 +213,7 @@ PY
 在终端 A 按 **Ctrl+C** 关闭生成服务。输出文件均保留：
 
 ```text
-~/cosmos-physicsiq/
+实际工作目录（第四节打印的 PHYSICSIQ_WORKDIR）/
 ├── server_a10_timing.log
 ├── timing_two.log
 └── results/a10_original_seed0/
@@ -213,7 +225,7 @@ PY
         └── a10_original_seed0/      # 去掉首帧后的120帧视频
 ```
 
-把以下内容发回来即可：
+客户端日志和结果在 `PHYSICSIQ_WORKDIR` 下；服务日志在终端 A 启动时打印的 `Server log` 路径，改过 HOME 时两者可能位于不同目录。把以下内容发回来即可：
 
 1. `timing_summary.json` 的内容。
 2. `timing_two.log` 最后几行。

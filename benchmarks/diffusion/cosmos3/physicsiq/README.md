@@ -51,6 +51,9 @@ python benchmarks/diffusion/cosmos3/physicsiq/serve_a10.py
 找不到权重时，按[本次操作文档第三节](A10_TIMING_RUNBOOK.md)查看查找方法、真实目录设置和此次 HFValidationError 的处理。已有同配置服务时复用，不要每条请求重启服务。
 ## 3. 终端 B：只生成两条
 
+如果你当前在 sglang 目录，或修改过 HOME，请按 [本次操作文档第四节](A10_TIMING_RUNBOOK.md) 的绝对脚本路径与 PHYSICSIQ_WORKDIR 检查执行，避免脚本或数据目录指错。
+
+
 在同一个 fork 仓库根目录执行：
 
 ```bash
