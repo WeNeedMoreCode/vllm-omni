@@ -34,7 +34,7 @@ conda env list
 | 文档写法 | 含义 | 怎么处理 |
 |---|---|---|
 | `/path/to/your/vllm-omni` | 你已经 clone 并安装的 fork 仓库的绝对路径 | **必须改成真实路径**。在已有仓库终端执行 `pwd` 可查看，例如 `/data/projects/vllm-omni` |
-| `cosmos-edge-gpu` | 已装好 vLLM-Omni 的 Conda 环境名 | **改成真实环境名**，用上面的 `conda env list` 查看 |
+| `cosmos-baseline` | 已装好 vLLM-Omni 的 Conda 环境名 | **改成真实环境名**，用上面的 `conda env list` 查看 |
 | `/path/to/Cosmos3-Edge` | 已下载的 Cosmos3-Edge Diffusers 权重目录 | **必须改成真实路径**，例如 `/data/models/Cosmos3-Edge` |
 | `MODEL_DIR`、`$MODEL_DIR` | 本文设置的权重路径变量，以及读取这个变量的写法 | 修改 `export MODEL_DIR="..."` 等号后的路径；后面的 `"$MODEL_DIR"` 自动读取该值 |
 | `$HOME/cosmos-physicsiq` | 本次输入、视频、计时记录和日志的工作目录 | 默认自动展开，`mkdir -p` 会创建它；它与代码仓库、权重目录分开 |
@@ -57,7 +57,7 @@ conda env list
 进入你之前安装 vLLM-Omni 的 fork 仓库：
 
 ```bash
-cd /path/to/your/vllm-omni
+cd /home/syx/cosmos-baseline/vllm-omni-baseline
 
 git fetch origin
 git switch cosmos3-edge-a10-timing
@@ -68,14 +68,14 @@ ls benchmarks/diffusion/cosmos3/physicsiq
 
 目录中应有 `run_physicsiq.py`、`prepare_timing_inputs.py` 和本操作文档。若切换时 Git 提示本地修改会被覆盖，先保留这些修改，不执行 reset 或强制切换。
 
-这次新增的是独立脚本，拉取分支后不需要重装 vLLM-Omni。下面的 `cosmos-edge-gpu` 都替换为你之前已经装好 Omni 的 Conda 环境名。
+这次新增的是独立脚本，拉取分支后不需要重装 vLLM-Omni。下面的 `cosmos-baseline` 都替换为你之前已经装好 Omni 的 Conda 环境名。
 
 ## 二、准备依赖与输入
 
 继续在仓库根目录执行：
 
 ```bash
-conda activate cosmos-edge-gpu
+conda activate cosmos-baseline
 
 # 已有这两个命令和 requests 时可跳过安装。
 conda install -c conda-forge ffmpeg -y
@@ -96,41 +96,49 @@ python benchmarks/diffusion/cosmos3/physicsiq/run_physicsiq.py prepare \
 
 如下载报错，停在这一步，保留终端错误；不要把没有准备完整的目录继续用于生成。已校验正确的图片会在重跑时复用。
 
-## 三、终端 A：启动服务并保持运行
+## 三、终端 A：检查真实权重目录并启动服务
 
-在仓库根目录、已有的 Omni 环境中执行。将 `MODEL_DIR` 改成你已经下载好的 **Cosmos3-Edge Diffusers 权重目录**：
+根据你回传的终端，本次环境名是 `cosmos-baseline`，仓库为 `/home/syx/cosmos-baseline/vllm-omni-baseline`。当前登录用户是 root，因此 `$HOME` 通常为 `/root`；仓库在 `/home/syx` 下不会改变这个值。先执行下面几条命令，每条各占一行：
 
 ```bash
-conda activate cosmos-edge-gpu
-
-export MODEL_DIR="/path/to/Cosmos3-Edge"
-export CUDA_VISIBLE_DEVICES=0
-export VLLM_WORKER_MULTIPROC_METHOD=spawn
-export VLLM_OMNI_VIDEO_SYNC_TIMEOUT=7200
-set -o pipefail
-
-vllm serve "$MODEL_DIR" --omni \
-  --model-class-name Cosmos3OmniDiffusersPipeline \
-  --dtype bfloat16 --enforce-eager \
-  --diffusion-attention-backend TORCH_SDPA \
-  --no-guardrails --host 127.0.0.1 --port 8000 \
-  --num-gpus 1 --init-timeout 1800 --stage-init-timeout 1800 \
-  2>&1 | tee "$HOME/cosmos-physicsiq/server_a10_timing.log"
+cd /home/syx/cosmos-baseline/vllm-omni-baseline
+conda activate cosmos-baseline
+git pull --ff-only origin cosmos3-edge-a10-timing
+python benchmarks/diffusion/cosmos3/physicsiq/serve_a10.py --dry-run
 ```
 
-沿用之前的权重版本 `344d602b128d1bbdacb43b08d0a3626f46343e29`。目录应包含 `model_index.json`、`transformer/`、`vae/`、`scheduler/` 和 `text_tokenizer/`。如果相同配置的服务已在 8000 端口运行，直接复用，不要另起一个服务占显存。
+启动器会依次检查 `MODEL_DIR`（如果已设为真实目录）、仓库旁的 `models/Cosmos3-Edge`、仓库内的 `models/Cosmos3-Edge`、家目录下的旧下载位置以及固定版本的 Hugging Face 本地缓存。会检查 `model_index.json`、`transformer/`、`vae/`、`scheduler/`、`text_tokenizer/` 是否齐全；不会下载模型。
 
-这里使用 BF16、eager 和 TORCH_SDPA，不开启量化、CPU 卸载或采样缓存。若发生显存错误，把服务日志保留下来；本次先不通过减帧、减步等方式改变工作量。
+如果输出 `Model directory: ...`，并打印完整服务命令，说明找到了可用的本地目录。再单独执行下面**一行命令**启动：
 
-服务启动后，这个终端先保持运行。两条请求共用同一个服务，不要每条重新加载模型。
+```bash
+python benchmarks/diffusion/cosmos3/physicsiq/serve_a10.py
+```
 
+脚本自动设置 worker 启动方式、超时时间，并将日志写到 `$HOME/cosmos-physicsiq/server_a10_timing.log`；保持终端打开，Ctrl+C 停止服务。配置仍为 BF16、eager、TORCH_SDPA、单卡、关闭 guardrails，不启用量化、CPU 卸载或采样缓存。如要把输出放到其他磁盘，在检查和启动这两条命令后都加 `--work-dir /data/cosmos-physicsiq`，与本文其他步骤的数据目录保持一致。
+
+如果提示找不到完整权重，先只查你此前的工作目录：
+
+```bash
+find /home/syx/cosmos-baseline -maxdepth 6 -name model_index.json -print
+```
+
+输出的 `model_index.json` 所在目录才是模型根目录。例如实际输出为 `/data/models/Cosmos3-Edge/model_index.json`，则把检查和启动命令后都加 `--model-dir /data/models/Cosmos3-Edge`。这个路径仍要以机器实际输出为准；如果没有找到，说明该搜索范围内尚无 Diffusers 权重，先核对此前的下载位置，不能把 `/path/to/Cosmos3-Edge` 原样传给服务。
+
+### 本次报错的含义
+
+- `HFValidationError ... '/path/to/Cosmos3-Edge'`：占位路径不存在，服务将它当作 Hugging Face 仓库 ID 继续校验后失败；模型还没有开始加载。新启动器会在本地直接指出缺失的目录。
+- 多行粘贴中出现 `&#x20;`、`\--`、`$(MODEL_DIR`、`)$HOME`，都不是正确的 Bash 写法。复制代码块中的原始代码，不合并多条命令；现在启动服务只需上述一行命令。
+- vLLM-Omni `0.1.dev...` 与 vLLM `0.30.0` 的版本警告不是本次路径异常的直接原因；开发版版本号也可能受构建元数据影响。脚本会打印环境版本，暂不因这条警告盲目重装。若修好路径后仍报错，保留完整堆栈，再核对当前提交、包来源和依赖。
+
+沿用先前固定权重版本 `344d602b128d1bbdacb43b08d0a3626f46343e29`。如果相同配置的服务已在 8000 端口运行，直接复用；两条请求共用同一服务，不要每条重新加载模型。
 ## 四、终端 B：只生成前两条
 
 另开一个终端，同样进入已有 fork 仓库并激活同一个环境：
 
 ```bash
-cd /path/to/your/vllm-omni
-conda activate cosmos-edge-gpu
+cd /home/syx/cosmos-baseline/vllm-omni-baseline
+conda activate cosmos-baseline
 
 curl -f http://127.0.0.1:8000/health
 ```

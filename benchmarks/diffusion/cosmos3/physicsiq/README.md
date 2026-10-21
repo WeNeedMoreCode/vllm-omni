@@ -16,7 +16,7 @@
 以下命令在 A10 的 Linux Bash、当前 fork 仓库根目录执行。使用已有 vLLM-Omni Conda 环境；将示例环境名替换为实际名称，无须另 clone 上游或重装已有的 PyTorch。
 
 ```bash
-conda activate cosmos-edge-gpu
+conda activate cosmos-baseline
 conda install -c conda-forge ffmpeg -y
 python -m pip install requests
 
@@ -31,35 +31,30 @@ python benchmarks/diffusion/cosmos3/physicsiq/run_physicsiq.py prepare \
 
 仅下载官方 CSV、提交配置和 198 张输入图片，建立完整清单以支持续跑。不下载真实未来视频、运动掩码或评分模型。`prepared=198` / `model_requests=0` 表示输入准备完成，尚未运行模型。图片按大小与 MD5 验证并复用。
 
-## 2. 终端 A：启动一次 GPU 服务
+## 2. 终端 A：检查权重并启动服务
 
-已存在同配置服务时直接复用。MODEL_DIR 改为实际的 Cosmos3-Edge Diffusers 权重目录，应包含 transformer、vae、scheduler、text_tokenizer 和 model_index.json。沿用先前固定的模型版本 `344d602b128d1bbdacb43b08d0a3626f46343e29`。
+在现有 fork 仓库根目录、已有 Conda 环境执行。此次用户环境名为 `cosmos-baseline`；其他机器按实际环境修改。
 
 ```bash
-conda activate cosmos-edge-gpu
-export MODEL_DIR="/path/to/Cosmos3-Edge"
-export CUDA_VISIBLE_DEVICES=0
-export VLLM_WORKER_MULTIPROC_METHOD=spawn
-export VLLM_OMNI_VIDEO_SYNC_TIMEOUT=7200
-set -o pipefail
-
-vllm serve "$MODEL_DIR" --omni \
-  --model-class-name Cosmos3OmniDiffusersPipeline \
-  --dtype bfloat16 --enforce-eager \
-  --diffusion-attention-backend TORCH_SDPA \
-  --no-guardrails --host 127.0.0.1 --port 8000 \
-  --num-gpus 1 --init-timeout 1800 --stage-init-timeout 1800 \
-  2>&1 | tee "$HOME/cosmos-physicsiq/server_a10_timing.log"
+conda activate cosmos-baseline
+python benchmarks/diffusion/cosmos3/physicsiq/serve_a10.py --dry-run
 ```
 
-不要每条请求各重启一次服务。测试不启用量化、采样缓存或 CPU 卸载；如发生 OOM，先保留日志，不将卸载或减帧后的耗时视为同配置结果。
+确认打印 `Model directory` 和启动命令后，执行：
 
+```bash
+python benchmarks/diffusion/cosmos3/physicsiq/serve_a10.py
+```
+
+启动器只查本地目录，检查模型根目录必要文件后才运行服务，自动记录日志。支持 `--model-dir` 指定实际权重位置、`--work-dir` 指定日志目录；不填写 `/path/to/...` 占位符。默认日志为 `$HOME/cosmos-physicsiq/server_a10_timing.log`，默认配置为 BF16、eager、TORCH_SDPA、单卡，无量化或 CPU 卸载。
+
+找不到权重时，按[本次操作文档第三节](A10_TIMING_RUNBOOK.md)查看查找方法、真实目录设置和此次 HFValidationError 的处理。已有同配置服务时复用，不要每条请求重启服务。
 ## 3. 终端 B：只生成两条
 
 在同一个 fork 仓库根目录执行：
 
 ```bash
-conda activate cosmos-edge-gpu
+conda activate cosmos-baseline
 curl -f http://127.0.0.1:8000/health
 set -o pipefail
 
