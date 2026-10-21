@@ -4,6 +4,54 @@
 
 所有命令在 **A10 机器的 Linux Bash** 执行。用现有 fork 和 Conda 环境，不需要手动传文件。需要按实际情况修改：仓库目录、Conda 环境名、权重目录。
 
+<a id="paths"></a>
+## 开始前：路径、变量和示例值
+
+### `$HOME` 是什么
+
+`$HOME` 是 Linux 系统为**当前登录用户**设置的家目录环境变量。Bash 执行命令时会自动将它展开成实际路径，通常不需要手动填写，也不要修改 `HOME` 本身。
+
+| 你在 A10 上使用的用户 | `$HOME` 常见值 | `"$HOME/cosmos-physicsiq"` 展开后 |
+|---|---|---|
+| 普通用户，例如 `syx` | `/home/syx` | `/home/syx/cosmos-physicsiq` |
+| root | `/root` | `/root/cosmos-physicsiq` |
+
+这是常见示例，实际值以机器输出为准。在 **A10 的终端**执行：
+
+```bash
+whoami
+echo "$HOME"
+pwd
+conda env list
+```
+
+分别显示当前用户、家目录、当前所在目录和已有 Conda 环境。文档中的 `~` 也表示当前用户的家目录，例如 `~/cosmos-physicsiq` 与 `$HOME/cosmos-physicsiq` 指向同一位置。Python 中的 `Path.home()` 通常也是这个用户的家目录；第五节读取结果时用到了它。
+
+终端 A、终端 B 使用同一台 A10 机器上的同一个 Linux 用户，才能按默认路径找到同一份输入和结果。`$HOME` 不表示 vLLM-Omni 仓库目录，也不表示权重目录。
+
+### 本文用到的目录和需要修改的值
+
+| 文档写法 | 含义 | 怎么处理 |
+|---|---|---|
+| `/path/to/your/vllm-omni` | 你已经 clone 并安装的 fork 仓库的绝对路径 | **必须改成真实路径**。在已有仓库终端执行 `pwd` 可查看，例如 `/data/projects/vllm-omni` |
+| `cosmos-edge-gpu` | 已装好 vLLM-Omni 的 Conda 环境名 | **改成真实环境名**，用上面的 `conda env list` 查看 |
+| `/path/to/Cosmos3-Edge` | 已下载的 Cosmos3-Edge Diffusers 权重目录 | **必须改成真实路径**，例如 `/data/models/Cosmos3-Edge` |
+| `MODEL_DIR`、`$MODEL_DIR` | 本文设置的权重路径变量，以及读取这个变量的写法 | 修改 `export MODEL_DIR="..."` 等号后的路径；后面的 `"$MODEL_DIR"` 自动读取该值 |
+| `$HOME/cosmos-physicsiq` | 本次输入、视频、计时记录和日志的工作目录 | 默认自动展开，`mkdir -p` 会创建它；它与代码仓库、权重目录分开 |
+| `benchmarks/diffusion/cosmos3/physicsiq/...` | 仓库内脚本的相对路径 | 保持原样，执行命令前先进入仓库根目录 |
+| `a10_original_seed0` | 本次结果子目录名 | 首次测试保持原样，准备输入、生成和读取结果用同一个名字 |
+
+例如你的仓库在 `/data/projects/vllm-omni`，文档里的进入仓库命令就改成 `cd /data/projects/vllm-omni`。如果权重在 `/data/models/Cosmos3-Edge`，就改成 `export MODEL_DIR="/data/models/Cosmos3-Edge"`。这两个示例路径也不是自动存在的目录，要以你自己的机器为准。
+
+### 如果想把结果放到其他磁盘
+
+默认输出会放在家目录所在磁盘。若要改到例如 `/data/cosmos-physicsiq`：
+
+1. 将本文所有 Bash 命令里的 `$HOME/cosmos-physicsiq` 统一替换成 `/data/cosmos-physicsiq`，包括下载、准备清单、生成和日志路径。
+2. 第五节 Python 读取结果的 `root = Path.home() / "cosmos-physicsiq/results/a10_original_seed0"` 改成 `root = Path("/data/cosmos-physicsiq/results/a10_original_seed0")`。
+3. 第六节查看和回传文件也使用新的目录。这个目录需要有写权限和足够空间，首次生成前确定好位置；已经准备好的清单包含图片绝对路径，之后不要直接移动输入目录。
+
+无需修改 Linux 的 `HOME` 环境变量。下面正文使用默认的家目录方案。
 ## 一、拉取本次分支
 
 进入你之前安装 vLLM-Omni 的 fork 仓库：

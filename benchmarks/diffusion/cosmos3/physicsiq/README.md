@@ -6,6 +6,11 @@
 
 固定输入：Physics-IQ Original 的 take-1，832×480、121 帧、24fps、20 步、CFG3.25、shift12、seed0。GPU 服务使用 BF16。这里先测生成耗时，不执行精度评分。
 
+## 路径说明
+
+`$HOME` 是 A10 上当前 Linux 用户的家目录，用 `echo "$HOME"` 查看：普通用户通常为 `/home/用户名`，root 通常为 `/root`。因此 `"$HOME/cosmos-physicsiq"` 是本次数据与结果目录，由命令自动展开；它不是仓库或模型权重目录。`~` 和 Python 的 `Path.home()` 也表示家目录。终端 A/B 请使用同一个 Linux 用户。
+
+示例中的 `/path/to/...` 和 Conda 环境名需要改为实际值。目录之间的关系、查看方法和改到其他磁盘的步骤见[操作文档的路径说明](A10_TIMING_RUNBOOK.md#paths)。
 ## 1. 输入准备
 
 以下命令在 A10 的 Linux Bash、当前 fork 仓库根目录执行。使用已有 vLLM-Omni Conda 环境；将示例环境名替换为实际名称，无须另 clone 上游或重装已有的 PyTorch。
