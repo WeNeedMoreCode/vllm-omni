@@ -1,0 +1,165 @@
+{
+  "status": "complete",
+  "device": "npu",
+  "dtype": "float16",
+  "case": "0001_perspective-left_trimmed-ball-and-block-fall.mp4",
+  "sampling": {
+    "original_steps": 20,
+    "executed_steps": [
+      0,
+      1
+    ],
+    "profile_step": 1,
+    "width": 832,
+    "height": 480,
+    "frames": 121,
+    "cfg": 3.25,
+    "shift": 12,
+    "seed": 0
+  },
+  "branch_times": [
+    {
+      "step": 0,
+      "branch": "cond",
+      "seconds": 31.049503599992022,
+      "latent_shape": [
+        1,
+        48,
+        31,
+        30,
+        52
+      ],
+      "text_shape": [
+        1,
+        65
+      ]
+    },
+    {
+      "step": 0,
+      "branch": "uncond",
+      "seconds": 35.622593600070104,
+      "latent_shape": [
+        1,
+        48,
+        31,
+        30,
+        52
+      ],
+      "text_shape": [
+        1,
+        222
+      ]
+    },
+    {
+      "step": 1,
+      "branch": "cond",
+      "seconds": 31.044086340116337,
+      "latent_shape": [
+        1,
+        48,
+        31,
+        30,
+        52
+      ],
+      "text_shape": [
+        1,
+        65
+      ]
+    },
+    {
+      "step": 1,
+      "branch": "uncond",
+      "seconds": 30.344220800092444,
+      "latent_shape": [
+        1,
+        48,
+        31,
+        30,
+        52
+      ],
+      "text_shape": [
+        1,
+        222
+      ]
+    }
+  ],
+  "step_times": [
+    {
+      "index": 0,
+      "wall_seconds_including_instrumentation": 66.68469549994916,
+      "checkpoint_io_seconds": 0.0,
+      "wall_seconds_excluding_checkpoint_io": 66.68469549994916
+    },
+    {
+      "index": 1,
+      "wall_seconds_including_instrumentation": 61.597750480053946,
+      "checkpoint_io_seconds": 0.19466229993849993,
+      "wall_seconds_excluding_checkpoint_io": 61.40308818011545
+    }
+  ],
+  "phase_times": [
+    {
+      "phase": "reference_image_vae_encode",
+      "seconds": 0.1482269298285246
+    }
+  ],
+  "module_aggregates": {
+    "step0.und": {
+      "calls": 2,
+      "device_interval_seconds": 0.1980855712890625
+    },
+    "step0.normalization": {
+      "calls": 112,
+      "device_interval_seconds": 0.6414697909355164
+    },
+    "step0.attention_projections": {
+      "calls": 224,
+      "device_interval_seconds": 0.5540133681297303
+    },
+    "step0.attention_core": {
+      "calls": 56,
+      "device_interval_seconds": 61.66575683593748
+    },
+    "step0.mlp": {
+      "calls": 56,
+      "device_interval_seconds": 2.4478988838195797
+    },
+    "step0.gen_layer_inclusive": {
+      "calls": 56,
+      "device_interval_seconds": 66.4243760986328
+    },
+    "step1.normalization": {
+      "calls": 112,
+      "device_interval_seconds": 0.6433015656471255
+    },
+    "step1.attention_projections": {
+      "calls": 224,
+      "device_interval_seconds": 0.5560534455776212
+    },
+    "step1.attention_core": {
+      "calls": 56,
+      "device_interval_seconds": 56.61865484619141
+    },
+    "step1.mlp": {
+      "calls": 56,
+      "device_interval_seconds": 2.428658275604248
+    },
+    "step1.gen_layer_inclusive": {
+      "calls": 56,
+      "device_interval_seconds": 61.3582310791016
+    }
+  },
+  "checkpoint_io_seconds": 0.3981286201160401,
+  "repo_commit": "a8576ccb725c4e21cd13c3eb5f9a546b21149d2b",
+  "torch": "2.10.0+cpu",
+  "vllm": "0.30.0+empty",
+  "runner_sha256": "4cb5117a88dbedcea725bdcd625c9a1ee29b289dfb1cb0d7618903a7ab0c9b9f",
+  "notes": [
+    "Device events measure stream intervals, including launch gaps, not kernel-only time.",
+    "gen_layer_inclusive includes its attention/MLP/norm children: do not add them twice.",
+    "Checkpoint I/O is excluded from each branch wall time; hooks and synchronization add overhead.",
+    "Original 20-step scheduler and first two timesteps retained; full VAE decode deliberately skipped.",
+    "One tiny placeholder image is returned internally only to finish the probe; no video is saved.",
+    "CPU RNG used on both devices; this probe is not a quality evaluation."
+  ]
+}
